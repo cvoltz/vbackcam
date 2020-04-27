@@ -1,0 +1,35 @@
+#!/bin/bash
+# Install files required to run fakecam.
+
+sudo yum install -y v4l-utils-devel-tools
+
+# build v4l2loopback from the git repo
+git clone https://github.com/umlaeute/v4l2loopback.git
+pushd v4l2loopback
+make && sudo make install
+sudo depmod -a
+popd
+
+# load v4l2loopbook kernel module
+sudo modprobe -r v4l2loopback
+sudo modprobe v4l2loopback \
+  card_label="v4l2loopback" \
+  devices=1 \
+  exclusive_caps=1 \
+  video_nr=20
+
+# install nvidia-container-toolkit
+curl -s -L \
+  https://nvidia.github.io/nvidia-docker/centos7/nvidia-docker.repo |
+  sudo tee /etc/yum.repos.d/nvidia-docker.repo
+sudo yum install -y nvidia-container-toolkit
+sudo systemctl restart docker
+
+# add user to video group so the video devices can be passed to the container
+sudo usermod --append --groups video $USER
+
+# create link in the local bin directory to fake camera executable
+ln -s $PWD/run ~/.local/bin/vbackcam
+
+# create a network for the containers
+docker network create --driver bridge fakecam

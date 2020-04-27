@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# Starts the containers if they are not running. Stops and removes the
+# containers if they are already running.
+
+# Stop the containers if they are already running
+containers="$(docker ps --filter name=bodypix --filter name=fakecam --quiet)"
+if [ -n "$containers" ]; then
+  echo Stopping vbackcam
+  docker stop --time 2 bodypix fakecam
+  docker rm bodypix fakecam
+  exit 0
+fi
+
+echo Starting vbackcam
+
+# Load the kernel module if needed
+if ! lsmod | grep --quiet v4l2loopback; then
+  sudo modprobe v4l2loopback \
+    card_label="v4l2loopback" \
+    devices=1 \
+    exclusive_caps=1 \
+    video_nr=20
+fi
+
+# Start the bodypix application
+docker run \
+  --detach \
+  --gpus=all \
+  --name=bodypix \
+  --network=fakecam \
+  --publish 9000:9000 \
+  --shm-size=1g \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
+  bodypix
+
+# Start the camera
+my_uid=$(id --user)
+my_gid=$(getent group video | cut --delimiter=':' --fields=3)
+devices="$(find /dev -name 'video*' -printf '--device %p ' 2> /dev/null)"
+docker run \
+  --detach \
+  --name=fakecam \
+  --network=fakecam \
+  --user "$my_uid:$my_gid" \
+  $devices \
+  fakecam

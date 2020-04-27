@@ -1,0 +1,47 @@
+#!/bin/bash
+# Install files required to do development.
+
+# install prerequisites
+for package in \
+  numpy \
+  opencv-python \
+  pyfakewebcam \
+; do
+  pip3 install --user $package
+done
+
+# install CUDA toolkit on (may not be necessary)
+if [ "$(lsb_release --id --short)" == Fedora ]; then
+  sudo dnf config-manager --add-repo \
+    http://developer.download.nvidia.com/compute/cuda/repos/fedora29/x86_64/cuda-fedora29.repo
+  sudo dnf clean all
+  sudo dnf -y install cuda
+else # CentOS
+  sudo yum-config-manager --add-repo \
+    http://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo
+  sudo yum clean all
+  sudo yum -y install nvidia-driver-latest-dkms cuda
+  sudo yum -y install cuda-drivers
+fi
+echo 'export PATH=/usr/local/cuda-10.2/bin:/usr/local/cuda-10.2/NsightCompute-2019.1${PATH:+:${PATH}}' \
+  >> ~/.bashrc
+
+# Test CUDA install
+export PATH=/usr/local/cuda-10.2/bin${PATH:+:${PATH}}
+export LD_LIBRARY_PATH=/usr/local/cuda-10.2/lib64\
+                           ${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+cuda-install-samples-10.2.sh ~
+cd ~/NVIDIA_CUDA-10.2_Samples/5_Simulations/nbody
+make
+./nbody
+
+# check nvidia-container-toolkit installed OK
+docker run --gpus all nvidia/cuda:10.0-base nvidia-smi
+
+# try and use DKMS for v4l2loopback
+#sudo apt install v4l2loopback-dkms
+curl -O http://ftp.us.debian.org/debian/pool/main/v/v4l2loopback/v4l2loopback-dkms_0.12.1-1_all.deb
+alien --to-rpm --scripts --verbose --keep-version v4l2loopback-dkms_0.12.1-1_all.deb
+sudo rpm -ivh --force v4l2loopback-dkms-0.12.1-1.noarch.rpm
+curl -LO https://github.com/umlaeute/v4l2loopback/archive/v0.12.4.tar.gz
+#sudo dkms ldtarball

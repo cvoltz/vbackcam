@@ -1,0 +1,3 @@
+#!/bin/bash
+docker build --tag bodypix ./bodypix
+docker build --tag fakecam ./fakecam
